@@ -37,6 +37,9 @@ import {
     updateNodeShapeLegend,
 } from "./ui/colorLegend.js";
 import { initAboutModal, initInfoModal } from "./ui/infoModal.js";
+import { dbg } from "./debug/logger.js";
+
+const L = dbg("main");
 
 function showFatal(err) {
     console.error(err);
@@ -97,7 +100,7 @@ function applyAppState(cy, state, controls, previousState = null) {
         // Files live in public/data and are resolved relative to the served index.html.
         const graphUrl = publicAssetUrl("data/graph.json");
         const menuDefinitionsUrl = publicAssetUrl("data/menuDefinitions.json");
-        console.log("[main] data URL:", graphUrl);
+        L.log("data URL:", graphUrl);
 
         const [loaded, menuDefinitions] = await Promise.all([
             loadGraphData({ graphUrl }),
@@ -107,7 +110,7 @@ function applyAppState(cy, state, controls, previousState = null) {
         const edges = loaded?.edges ?? [];
         const diagnostics = loaded?.diagnostics ?? null;
 
-        console.log("[main] elements:", {
+        L.log("elements:", {
             nodes: nodes.length,
             edges: edges.length,
             diagnostics,

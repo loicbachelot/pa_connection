@@ -7,13 +7,16 @@ import {
 import { createAppState } from "../config/appState.js";
 import { visualSpec } from "../config/visualSpec.js";
 import { deriveGraphView } from "../graph/graphViewData.js";
-import { loadWorkshopSelection } from "../data/dataloader.js";
+import { loadWorkshopSelection, workshopSelectionFileAvailable } from "../data/dataloader.js";
 import { publicAssetUrl } from "../data/publicAssets.js";
+import { dbg } from "../debug/logger.js";
+
+const L = dbg("controls");
 
 function renderControlContainers(parentId, specs) {
     const parent = document.getElementById(parentId);
     if (!parent) {
-        console.warn(`[controls] Missing #${parentId}`);
+        L.warn(`Missing #${parentId}`);
         return;
     }
 
@@ -60,6 +63,14 @@ function setCheckboxesFromValues(container, checkedValues) {
     boxes.forEach((box) => {
         box.checked = checkedValues.has(box.value);
     });
+}
+
+function firstRowValue(row, keys) {
+    for (const key of keys) {
+        const value = String(row[key] ?? "").trim();
+        if (value) return value;
+    }
+    return "";
 }
 
 function getNodeData(node) {
@@ -146,14 +157,6 @@ function createInfoButton(documentRef, info) {
     wrapper.appendChild(button);
     wrapper.appendChild(panel);
     return wrapper;
-}
-
-function firstRowValue(row, keys) {
-    for (const key of keys) {
-        const value = String(row[key] ?? "").trim();
-        if (value) return value;
-    }
-    return "";
 }
 
 function renderChecklist(
@@ -362,17 +365,15 @@ export function initControls(cy, { onChange, menuDefinitions = {} }) {
     const visibleOrganizationSpec = selectionContainers.find((spec) => spec.visibleOnly);
     const selectionWarningEl = createSelectionWarning(selectionContainers);
     const workshopUrl = publicAssetUrl("data/workshop_selection.csv");
-    console.log("[controls] workshop selection URL:", workshopUrl);
-
     for (const spec of filterContainers) {
-        if (!spec.el) console.warn(`[controls] Missing #${spec.containerId}`);
+        if (!spec.el) L.warn(`Missing #${spec.containerId}`);
     }
     for (const spec of selectionContainers) {
-        if (!spec.el) console.warn(`[controls] Missing #${spec.containerId}`);
+        if (!spec.el) L.warn(`Missing #${spec.containerId}`);
     }
-    if (!relTypeFiltersEl) console.warn("[controls] Missing #relTypeFilters");
-    if (!pruneToggleEl) console.warn("[controls] Missing #togglePrune");
-    if (!layoutToggleEl) console.warn("[controls] Missing #toggleLayout");
+    if (!relTypeFiltersEl) L.warn("Missing #relTypeFilters");
+    if (!pruneToggleEl) L.warn("Missing #togglePrune");
+    if (!layoutToggleEl) L.warn("Missing #toggleLayout");
 
     const nodeFilterValues = Object.fromEntries(
         filterContainers.map((spec) => [
@@ -410,22 +411,22 @@ export function initControls(cy, { onChange, menuDefinitions = {} }) {
     });
 
     let workshopOrganizationNamesPromise = null;
-    let hasWorkshopSelection = null;
+    const workshopFileUrlPromise = workshopSelectionFileAvailable(workshopUrl)
+        .then((available) => available ? workshopUrl : null);
 
     const loadWorkshopOrganizationNames = async () => {
+        const workshopUrl = await workshopFileUrlPromise;
+        if (!workshopUrl) return new Set();
         const rows = await loadWorkshopSelection({ workshopUrl });
-        const names = rows
-            .map((row) => {
-                const csvName = firstRowValue(row, ["name", "Organization Name"]);
-                const csvId = firstRowValue(row, ["node_id", "Org ID"]);
-                return (
-                    orgNameById.get(normalizeLookupValue(csvId)) ??
-                    orgNameByNormalizedName.get(normalizeLookupValue(csvName)) ??
-                    csvName
-                );
-            })
-            .filter(Boolean);
-        return new Set(names);
+        return new Set(rows.map((row) => {
+            const csvName = firstRowValue(row, ["name", "Organization Name"]);
+            const csvId = firstRowValue(row, ["node_id", "Org ID"]);
+            return (
+                orgNameById.get(normalizeLookupValue(csvId)) ??
+                orgNameByNormalizedName.get(normalizeLookupValue(csvName)) ??
+                csvName
+            );
+        }).filter(Boolean));
     };
 
     const getWorkshopOrganizationNames = () => {
@@ -435,54 +436,41 @@ export function initControls(cy, { onChange, menuDefinitions = {} }) {
         return workshopOrganizationNamesPromise;
     };
 
-    const updateWorkshopButtonVisibility = (button) => {
-        button.hidden = hasWorkshopSelection !== true;
-        getWorkshopOrganizationNames()
-            .then(() => {
-                hasWorkshopSelection = true;
-                button.hidden = false;
-            })
-            .catch((err) => {
-                hasWorkshopSelection = false;
-                button.hidden = true;
-                console.warn("[controls] Workshop selection file is unavailable:", err);
-            });
-    };
-
     const applyWorkshopSelection = async () => {
         if (!visibleOrganizationSpec?.el) return;
         try {
-            const workshopOrganizationNames = await getWorkshopOrganizationNames();
-            setCheckboxesFromValues(visibleOrganizationSpec.el, workshopOrganizationNames);
+            setCheckboxesFromValues(
+                visibleOrganizationSpec.el,
+                await getWorkshopOrganizationNames()
+            );
             emit();
-        } catch (err) {
-            console.error("[controls] Failed to apply workshop selection:", err);
+        } catch (error) {
+            L.err("Failed to apply workshop selection:", error);
         }
     };
 
     const createWorkshopButton = () => {
-        const btnWorkshop = document.createElement("button");
-        btnWorkshop.type = "button";
-        btnWorkshop.textContent = "Workshop";
-        btnWorkshop.className = "checklist-action";
-        btnWorkshop.addEventListener("click", (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            applyWorkshopSelection();
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Workshop";
+        button.className = "checklist-action";
+        button.hidden = true;
+        button.addEventListener("click", applyWorkshopSelection);
+        workshopFileUrlPromise.then((workshopUrl) => {
+            button.hidden = !workshopUrl;
         });
-        updateWorkshopButtonVisibility(btnWorkshop);
-        return btnWorkshop;
+        return button;
     };
 
     for (const spec of filterContainers) {
         const values = nodeFilterValues[spec.stateKey] ?? [];
-        console.log(`[controls] ${spec.logKey}:`, values.length, values.slice(0, 10));
+        L.log(`${spec.logKey}:`, values.length, values.slice(0, 10));
     }
     for (const spec of selectionContainers) {
         const values = nodeSelectionValues[spec.stateKey] ?? [];
-        console.log(`[controls] ${spec.logKey}:`, values.length, values.slice(0, 10));
+        L.log(`${spec.logKey}:`, values.length, values.slice(0, 10));
     }
-    console.log("[controls] relTypes:", relTypes.length, relTypes.slice(0, 10));
+    L.log("relTypes:", relTypes.length, relTypes.slice(0, 10));
 
     const collectState = () => {
         const nodeFilterState = Object.fromEntries(

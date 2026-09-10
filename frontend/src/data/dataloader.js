@@ -59,6 +59,19 @@ function parseCSV(text) {
     return result.data;
 }
 
+export async function workshopSelectionFileAvailable(workshopUrl) {
+    try {
+        const response = await fetch(workshopUrl, {
+            method: "HEAD",
+            cache: "no-store",
+        });
+        const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+        return response.ok && !contentType.includes("text/html");
+    } catch {
+        return false;
+    }
+}
+
 export async function loadWorkshopSelection({
     workshopUrl = "/data/workshop_selection.csv",
 } = {}) {

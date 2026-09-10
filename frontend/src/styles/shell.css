@@ -47,7 +47,7 @@
 }
 
 .brand-logo-nsf {
-    height: 54px;
+    height: 70px;
 }
 
 .app-header-title {
@@ -179,6 +179,36 @@ body.is-resizing {
 .cy {
     position: absolute;
     inset: 0;
+}
+
+.graph-fit-button {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 14px;
+    color: var(--app-header-bg);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+
+.graph-fit-button:hover:not(:disabled) {
+    background: #edf5f6;
+    border-color: var(--app-header-bg);
+}
+
+.graph-fit-button:focus-visible {
+    outline: 2px solid var(--app-header-bg);
+    outline-offset: 3px;
+}
+
+.graph-fit-button:disabled {
+    opacity: 0.5;
+    cursor: default;
 }
 
 .panel {

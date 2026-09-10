@@ -167,6 +167,14 @@ function applyAppState(cy, state, controls, previousState = null) {
         });
         cy.scratch("_controls", controls);
         initSearchTab(cy);
+        const fitViewButton = document.getElementById("btnFitView");
+        fitViewButton.addEventListener("click", () => {
+            const visibleElements = cy.elements(":visible");
+            if (visibleElements.empty()) return;
+            cy.stop();
+            cy.fit(visibleElements, 40);
+        });
+        fitViewButton.disabled = false;
     } catch (e) {
         showFatal(e);
     }

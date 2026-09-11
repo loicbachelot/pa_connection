@@ -260,14 +260,16 @@ body.is-resizing {
 
 @media (max-width: 900px) {
     :root {
-        --app-header-height: 84px;
+        --app-header-height: 128px;
     }
 
     .app-header {
         grid-template-columns: 1fr;
+        grid-template-rows: 46px auto auto;
         justify-items: center;
-        gap: 6px;
-        padding: 10px 12px;
+        gap: 4px;
+        padding: 8px 12px;
+        box-sizing: border-box;
     }
 
     .app-header-title {
